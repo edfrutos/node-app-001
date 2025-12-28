@@ -1,0 +1,11 @@
+# Auxly - AI Task Management (internal data)
+.auxly/
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+.env
+README.old.md
+README.old2.md
