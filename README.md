@@ -1,37 +1,6 @@
-Perfecto, Eugenio. Vamos a hacerlo bien y sin parches 😊
-La idea no es “editar a mano el README que tienes”, sino sustituirlo por un README de plantilla profesional, coherente con todo lo que ya has construido (Docker, Scout, CI, puertos, etc.).
+# Node App 001
 
-Te explico cómo hacerlo y luego te doy el README.md completo listo para copiar.
-
-⸻
-
-✅ Cómo hacerlo (paso a paso, sin lío)
-1.	Abre tu repo
-/Volumes/ESSAGER/Github_Repositories/Node-Base-Template
-2.	Haz una copia de seguridad (por si acaso):
-
-mv README.md README.old.md
-
-    3.	Crea el nuevo README.md:
-
-nano README.md
-
-o con tu editor habitual
-
-    4.	Copia y pega íntegramente el README que te dejo abajo
-    5.	Guarda, commit y push:
-
-git add README.md
-git commit -m "docs: add professional README for template"
-git push
-
-⸻
-
-📄 README.md — PLANTILLA PROFESIONAL (VERSIÓN FINAL)
-
-# Node Base Template
-
-Plantilla base profesional para proyectos **Node.js** con Docker, Docker Scout y CI/CD integrado mediante GitHub Actions.
+Proyecto_001 nprofesional para proyectos **Node.js** con Docker, Docker Scout y CI/CD integrado mediante GitHub Actions.
 
 Diseñada para servir como **punto de partida limpio, seguro y reutilizable** para nuevos proyectos Node.
 

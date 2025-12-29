@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: edefrutos/node-base-template
+  IMAGE_NAME: edefrutos/node-app-001
 
 jobs:
   build-scan-push:
@@ -43,6 +43,7 @@ jobs:
           fi
 
       - name: Build and push (with SBOM + provenance)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -56,6 +57,9 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: ${{ steps.tags.outputs.SCAN_IMAGE }}
+          image: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           only-severities: high
           exit-code: true
+          format: table
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          write-comment: true

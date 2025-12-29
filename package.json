@@ -1,6 +1,6 @@
 {
-  "name": "node-base-template",
-  "version": "1.0.0",
+  "name": "node-app-001",
+  "version": "0.1.0",
   "description": "Node Base Template",
   "private": true,
   "type": "commonjs",

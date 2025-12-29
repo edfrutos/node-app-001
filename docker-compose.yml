@@ -1,9 +1,10 @@
 services:
   app:
-    image: edefrutos/node-base-template:latest
+    build: .
+    image: edefrutos/node-app-001:local
     ports:
-      - "${HOST_PORT:-5080}:${PORT:-3000}"
+      - "5081:3000"
     environment:
-      NODE_ENV: production
-      PORT: ${PORT:-3000}
+      NODE_ENV: development
+      PORT: 3000
     restart: unless-stopped
