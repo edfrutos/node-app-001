@@ -1,87 +1,153 @@
 name: build-and-scout
 
 on:
+  # CI en main + releases semver (v0.1.2, v1.0.0, etc.)
   push:
     branches:
       - main
     tags:
-      - "v*.*.*" # releases semver: v0.1.0, v0.1.1, v1.0.0...
+      - "v*.*.*"
+  # Validación en PRs contra main
+  pull_request:
+    branches:
+      - main
+  # Ejecución manual desde la UI
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: edefrutos/node-app-001
-
+# Permisos mínimos (Scout puede comentar en PR si lo permites)
 permissions:
   contents: read
-  issues: write
   pull-requests: write
+
+env:
+  # Repo confirmado en Docker Hub
+  IMAGE_NAME: edefrutos/node-app-001
 
 jobs:
   build-scan-push:
+    name: build-scan-push
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Código
+      # -------------------------
+      # 1) Checkout
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) Buildx (multi-arch + attestations)
+      # -------------------------
+      # 2) QEMU + Buildx para multi-arch
+      # -------------------------
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3) Login Docker Hub (secrets del repo)
-      #    DOCKERHUB_USERNAME = edefrutos
-      #    DOCKERHUB_TOKEN    = access token
+      # -------------------------
+      # 3) Login Docker Hub (NO en PR)
+      #    En PR no hacemos push a registry.
+      # -------------------------
       - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Tags automáticos:
-      #    - main -> latest
-      #    - tag vX.Y.Z -> X.Y.Z y latest (según config)
+      # -------------------------
+      # 4) Metadata: tags/labels coherentes
+      #    - tags semver cuando llega tag vX.Y.Z
+      #    - latest sólo en main
+      # -------------------------
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-      # 5) Build + Push + SBOM + provenance=max
-      - name: Build and push
-        id: build
+      # -------------------------
+      # 5A) Build para PR (local)
+      #    - No push
+      #    - Sí load para que Scout pueda leer local://
+      #    - Tag local estable para referenciar
+      # -------------------------
+      - name: Build (PR -> local image)
+        if: github.event_name == 'pull_request'
+        id: build_pr
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          pull: true
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: mode=max
+          provenance: true
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 6) Scout (política npm-only REALISTA)
-      #    - Escaneamos la imagen exacta construida (por digest), no un tag que pueda apuntar a otra cosa.
-      #    - Solo HIGH
-      #    - Solo con fix disponible
-      #    - Solo gestor npm (ignora SO/base: gpgv, libc, etc.)
-      - name: Scout CVEs (HIGH, fixed only, npm only)
+      # -------------------------
+      # 5B) Build+Push para main/tags
+      #    - Push multi-arch
+      #    - Digest disponible para escanear por @sha256
+      # -------------------------
+      - name: Build & Push (main/tags -> registry)
+        if: github.event_name != 'pull_request'
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          pull: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # -------------------------
+      # 6A) Scout en PR (local://)
+      #    Política: HIGH + only-fixed + ignore-base + npm-only
+      # -------------------------
+      - name: Scout CVEs (PR: HIGH, fixed only, npm only, ignore base)
+        if: github.event_name == 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: local://${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
+          only-severities: high
+          only-fixed: true
+          ignore-base: true
+          only-package-types: npm
+          summary: true
+          exit-code: true
+          write-comment: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------------------------
+      # 6B) Scout en main/tags (por digest en registry)
+      #    OJO: digest => SIEMPRE con @
+      # -------------------------
+      - name: Scout CVEs (main/tags: HIGH, fixed only, npm only, ignore base)
+        if: github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
           command: cves
           image: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           only-severities: high
           only-fixed: true
-          package-managers: npm
+          ignore-base: true
+          only-package-types: npm
           summary: true
           exit-code: true
-          write-comment: true
+          write-comment: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
