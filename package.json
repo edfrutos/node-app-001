@@ -6,15 +6,17 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major"
   },
   "license": "ISC",
   "dependencies": {
     "body-parser": "^2.2.1",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "tar": "^7.5.2"
   },
   "overrides": {
-  "glob": "11.1.0"
-}
+    "glob": "11.1.0"
+  }
 }
