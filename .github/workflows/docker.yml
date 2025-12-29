@@ -1,91 +1,79 @@
-name: Build, Scan and Push Docker Image
+name: build-and-scout
 
 on:
   push:
     branches:
       - main
     tags:
-      - "v*.*.*"          # Releases semver (v0.1.0, v1.0.1, etc)
+      - "v*.*.*" # releases semver: v0.1.0, v0.1.1, v1.0.0...
   workflow_dispatch:
 
 env:
   IMAGE_NAME: edefrutos/node-app-001
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   build-scan-push:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
-      id-token: write   # NECESARIO para SBOM y provenance
-
     steps:
-      # ------------------------------------------------------------------
-      # 1️⃣ Checkout del código
-      # ------------------------------------------------------------------
-      - name: Checkout repository
+      # 1) Código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------------------
-      # 2️⃣ Habilitar QEMU (multi-arch: amd64 + arm64)
-      # ------------------------------------------------------------------
+      # 2) Buildx (multi-arch + attestations)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # ------------------------------------------------------------------
-      # 3️⃣ Habilitar Docker Buildx
-      # ------------------------------------------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ------------------------------------------------------------------
-      # 4️⃣ Login en Docker Hub
-      # ------------------------------------------------------------------
+      # 3) Login Docker Hub (secrets del repo)
+      #    DOCKERHUB_USERNAME = edefrutos
+      #    DOCKERHUB_TOKEN    = access token
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ------------------------------------------------------------------
-      # 5️⃣ Generar metadata (tags y labels)
-      # ------------------------------------------------------------------
-      - name: Docker metadata
+      # 4) Tags automáticos:
+      #    - main -> latest
+      #    - tag vX.Y.Z -> X.Y.Z y latest (según config)
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
 
-      # ------------------------------------------------------------------
-      # 6️⃣ Build + Push (SBOM + provenance)
-      # ------------------------------------------------------------------
-      - name: Build and push image
+      # 5) Build + Push + SBOM + provenance=max
+      - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          sbom: true
           provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # ------------------------------------------------------------------
-      # 7️⃣ Docker Scout — POLÍTICA DECIDIDA
-      #
-      # ✔ Solo paquetes npm
-      # ✔ Solo vulnerabilidades HIGH
-      # ✔ Solo si existe FIX
-      # ✖ Ignora SO base (Debian)
-      # ✔ Escanea la imagen EXACTA (digest)
-      # ------------------------------------------------------------------
-      - name: Scout CVEs (npm only, fixed only)
+      # 6) Scout (política npm-only REALISTA)
+      #    - Escaneamos la imagen exacta construida (por digest), no un tag que pueda apuntar a otra cosa.
+      #    - Solo HIGH
+      #    - Solo con fix disponible
+      #    - Solo gestor npm (ignora SO/base: gpgv, libc, etc.)
+      - name: Scout CVEs (HIGH, fixed only, npm only)
         uses: docker/scout-action@v1
         with:
           command: cves
