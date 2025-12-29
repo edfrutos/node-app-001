@@ -57,7 +57,7 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          image: ${{ env.IMAGE_NAME }}:${{ steps.build.outputs.digest }}
           only-severities: high
           exit-code: true
           format: table

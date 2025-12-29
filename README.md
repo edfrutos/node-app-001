@@ -1,6 +1,6 @@
 # Node App 001
 
-Proyecto_001 nprofesional para proyectos **Node.js** con Docker, Docker Scout y CI/CD integrado mediante GitHub Actions.
+Proyecto_001 nprofesional para proyectos __Node.js__ con Docker, Docker Scout y CI/CD integrado mediante GitHub Actions.
 
 Diseñada para servir como **punto de partida limpio, seguro y reutilizable** para nuevos proyectos Node.
 
@@ -13,6 +13,7 @@ Diseñada para servir como **punto de partida limpio, seguro y reutilizable** pa
 - Usuario no root en runtime
 - Docker Scout (SBOM + CVEs)
 - GitHub Actions:
+
    - Build
    - Scan de vulnerabilidades
    - Push automático a Docker Hub
@@ -154,3 +155,13 @@ Eugenio De Frutos Sánchez
 
 
 ```
+
+## Security & Vulnerabilities
+
+This project uses Docker Scout to scan for vulnerabilities.
+
+Known high-severity vulnerabilities coming from the base OS image
+(e.g. Debian packages such as gpgv) are currently not blocking the CI
+pipeline if no fixed version exists and the package is not used at runtime.
+
+All application-level dependencies are strictly enforced.
