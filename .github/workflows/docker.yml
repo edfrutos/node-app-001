@@ -113,7 +113,7 @@ jobs:
       # 6A) Scout en PR (local://)
       #    Política: HIGH + only-fixed + ignore-base + npm-only
       # -------------------------
-      - name: Scout CVEs (PR: HIGH, fixed only, npm only, ignore base)
+      - name: "Scout CVEs (PR: HIGH, fixed only, npm only, ignore base)"
         if: github.event_name == 'pull_request'
         uses: docker/scout-action@v1
         with:
@@ -132,7 +132,7 @@ jobs:
       # 6B) Scout en main/tags (registry por digest)
       #    OJO: digest SIEMPRE con @
       # -------------------------
-      - name: Scout CVEs (main/tags: HIGH, fixed only, npm only, ignore base)
+      - name: "Scout CVEs (main/tags: HIGH, fixed only, npm only, ignore base)"
         if: github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
