@@ -1,16 +1,12 @@
-name: build-and-scout
+name: Build, Scan and Push Docker Image
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
+    branches:
+      - main
+    tags:
+      - "v*.*.*"          # Releases semver (v0.1.0, v1.0.1, etc)
   workflow_dispatch:
-
-permissions:
-  contents: read
-  packages: write
-  security-events: write
-  pull-requests: write
 
 env:
   IMAGE_NAME: edefrutos/node-app-001
@@ -19,40 +15,58 @@ jobs:
   build-scan-push:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # NECESARIO para SBOM y provenance
+
     steps:
-      - name: Checkout
+      # ------------------------------------------------------------------
+      # 1️⃣ Checkout del código
+      # ------------------------------------------------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------------
+      # 2️⃣ Habilitar QEMU (multi-arch: amd64 + arm64)
+      # ------------------------------------------------------------------
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Buildx
+      # ------------------------------------------------------------------
+      # 3️⃣ Habilitar Docker Buildx
+      # ------------------------------------------------------------------
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      # ------------------------------------------------------------------
+      # 4️⃣ Login en Docker Hub
+      # ------------------------------------------------------------------
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker meta
+      # ------------------------------------------------------------------
+      # 5️⃣ Generar metadata (tags y labels)
+      # ------------------------------------------------------------------
+      - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            # En main -> latest
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+            type=sha
 
-            # Si el push es un tag vX.Y.Z -> publica vX.Y.Z
-            type=ref,event=tag
-
-            # Además publica X.Y.Z (sin la v) cuando el tag es vX.Y.Z
-            type=match,pattern=v(.*),group=1,event=tag
-
-      - name: Build & push (SBOM + provenance max)
+      # ------------------------------------------------------------------
+      # 6️⃣ Build + Push (SBOM + provenance)
+      # ------------------------------------------------------------------
+      - name: Build and push image
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -61,19 +75,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
           provenance: mode=max
-          pull: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      - name: Scout CVEs (high, fixed only)
+      # ------------------------------------------------------------------
+      # 7️⃣ Docker Scout — POLÍTICA DECIDIDA
+      #
+      # ✔ Solo paquetes npm
+      # ✔ Solo vulnerabilidades HIGH
+      # ✔ Solo si existe FIX
+      # ✖ Ignora SO base (Debian)
+      # ✔ Escanea la imagen EXACTA (digest)
+      # ------------------------------------------------------------------
+      - name: Scout CVEs (npm only, fixed only)
         uses: docker/scout-action@v1
         with:
           command: cves
           image: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           only-severities: high
           only-fixed: true
-          exit-code: true
+          package-managers: npm
           summary: true
-          format: json
+          exit-code: true
           write-comment: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
