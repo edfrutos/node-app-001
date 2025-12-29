@@ -13,7 +13,6 @@ permissions:
   pull-requests: write
 
 env:
-  # Cambia "node-app-001" si el repo es otro
   IMAGE_NAME: edefrutos/node-app-001
 
 jobs:
@@ -36,17 +35,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Genera tags/labels automáticamente:
-      # - En main: latest
-      # - En tags vX.Y.Z: X.Y.Z y vX.Y.Z (según config)
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag
+            # En main -> latest
             type=raw,value=latest,enable={{is_default_branch}}
+
+            # Si el push es un tag vX.Y.Z -> publica vX.Y.Z
+            type=ref,event=tag
+
+            # Además publica X.Y.Z (sin la v) cuando el tag es vX.Y.Z
+            type=match,pattern=v(.*),group=1,event=tag
 
       - name: Build & push (SBOM + provenance max)
         id: build
@@ -63,8 +65,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Escaneo por DIGEST (inmutable, no por tag).
-      # Política CVE: solo HIGH y solo si tienen fix => el OS "not fixed" no rompe el pipeline.
       - name: Scout CVEs (high, fixed only)
         uses: docker/scout-action@v1
         with:
