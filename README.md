@@ -171,3 +171,4 @@ Known high-severity vulnerabilities coming from the base OS image
 pipeline if no fixed version exists and the package is not used at runtime.
 
 All application-level dependencies are strictly enforced.
+
