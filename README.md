@@ -54,8 +54,14 @@ Diseñada para servir como **punto de partida limpio, seguro y reutilizable** pa
 
 ```bash
 docker build -t node-base-template .
+```
 
-2. Ejecutar el contenedor
+# 2. Ejecutar el contenedor
+
+```bash
+
+
+
 
 docker run --rm -p 5080:3000 node-base-template
 
