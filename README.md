@@ -58,11 +58,6 @@ docker build -t node-base-template .
 
 # 2. Ejecutar el contenedor
 
-```bash
-
-
-
-
 docker run --rm -p 5080:3000 node-base-template
 
 👉 Accede en el navegador a:
@@ -158,9 +153,6 @@ MIT
 Eugenio De Frutos Sánchez
 🌐 https://www.edefrutos.me
 🐙 https://github.com/edfrutos
-
-
-```
 
 ## Security & Vulnerabilities
 
