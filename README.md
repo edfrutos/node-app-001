@@ -54,8 +54,9 @@ Diseñada para servir como **punto de partida limpio, seguro y reutilizable** pa
 
 ```bash
 docker build -t node-base-template .
+```
 
-2. Ejecutar el contenedor
+# 2. Ejecutar el contenedor
 
 docker run --rm -p 5080:3000 node-base-template
 
@@ -153,9 +154,6 @@ Eugenio De Frutos Sánchez
 🌐 https://www.edefrutos.me
 🐙 https://github.com/edfrutos
 
-
-```
-
 ## Security & Vulnerabilities
 
 This project uses Docker Scout to scan for vulnerabilities.
@@ -165,3 +163,4 @@ Known high-severity vulnerabilities coming from the base OS image
 pipeline if no fixed version exists and the package is not used at runtime.
 
 All application-level dependencies are strictly enforced.
+
