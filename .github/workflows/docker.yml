@@ -125,7 +125,7 @@ jobs:
           only-package-types: npm
           summary: true
           exit-code: true
-          write-comment: true
+          write-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # -------------------------
