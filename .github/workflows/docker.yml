@@ -77,7 +77,8 @@ jobs:
 
       # -------------------------
       # 5A) Build en PR: imagen local (sin push)
-      #    - load:true -> existe localmente y Scout puede leer local://
+      #    - UNA sola arquitectura
+      #    - load:true para Scout local://
       # -------------------------
       - name: Build (PR -> local image)
         if: github.event_name == 'pull_request'
@@ -85,6 +86,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           pull: true
           load: true
           tags: ${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
