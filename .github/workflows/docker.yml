@@ -1,35 +1,32 @@
 name: build-and-scout
 
 on:
-  # 1) CI en pushes a main (integración) y tags semver (releases)
+  # CI en main + releases semver
   push:
     branches:
       - main
     tags:
       - "v*.*.*"
-
-  # 2) Validación en PRs contra main (antes de merge)
+  # Validación en PRs contra main
   pull_request:
     branches:
       - main
-
-  # 3) Manual
+  # Ejecución manual
   workflow_dispatch:
 
-# Evita runs simultáneos del mismo ref (recomendable)
+# Evita ejecuciones simultáneas del mismo ref
 concurrency:
   group: build-and-scout-${{ github.ref }}
   cancel-in-progress: true
 
-# Permisos mínimos; en PRs puede comentar (si no viene de fork)
+# Permisos mínimos
 permissions:
   contents: read
   pull-requests: write
 
 env:
+  # Repo Docker Hub confirmado
   IMAGE_NAME: edefrutos/node-app-001
-  # política npm-only: npm audit se ejecuta siempre en PR y también en main/tags (rápido)
-  NODE_ENV: production
 
 jobs:
   build-scan-push:
@@ -43,51 +40,65 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # -------------------------
-      # 2) Node para npm audit (política n
-      #    Esto evita depender de Scout en PRs.
-      # -------------------------
-      - name: Set up Node
+      # ==========================================================
+      # PR: política "npm-only" REALISTA (sin Docker Scout)
+      # - Ejecuta npm audit (prod only) y construye Docker (amd64)
+      # - Así NO dependes de Docker Scout entitlement en PR
+      # ==========================================================
+      - name: Set up Node (PR)
+        if: github.event_name == 'pull_request'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
 
-      # Instala dependencias (usa package-lock.json)
-      - name: Install dependencies
+      - name: Install dependencies (PR)
+        if: github.event_name == 'pull_request'
         run: npm ci
 
-      # Gate npm-only (realista y estándar)
-      # --omit=dev: solo producción
-      # --audit-level=high: falla si hay HIGH o CRITICAL en npm
-      - name: npm audit (prod only, fail on high)
+      # Falla si hay HIGH o CRITICAL en dependencias de producción
+      - name: npm audit (PR, prod only, fail on high)
+        if: github.event_name == 'pull_request'
         run: npm audit --omit=dev --audit-level=high
 
-      # -------------------------
-      # 3) QEMU + Buildx (multi-arch)
-      # -------------------------
-      - name: Set up QEMU
+      # Build Docker en PR (sin push, una sola arquitectura)
+      # Nota: NO usamos --load ni attestations aquí para evitar errores de exporter.
+      - name: Docker build (PR, no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          pull: true
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ==========================================================
+      # main/tags: build+push multi-arch + Scout (npm-only)
+      # ==========================================================
+      - name: Set up QEMU (main/tags)
+        if: github.event_name != 'pull_request'
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx (main/tags)
+        if: github.event_name != 'pull_request'
         uses: docker/setup-buildx-action@v3
 
-      # -------------------------
-      # 4) Login Docker Hub (NO en PR)
-      # -------------------------
-      - name: Login to Docker Hub
+      - name: Login to Docker Hub (main/tags)
         if: github.event_name != 'pull_request'
-       ses: docker/login-action@v3
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # -------------------------
-      # 5) Metadata: tags/labels coherentes
-      #    - vX.Y.Z cuando llega tag
-      #    - latest sólo en main
-      # -------------------------
-      - name: Docker meta
+      # Tags/labels coherentes:
+      # - vX.Y.Z cuando llega un tag
+      # - latest solo en main
+      - name: Docker meta (main/tags)
+        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -99,32 +110,7 @@ jobs:
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # -------------------------
-      # 6A) Build en PR: imagen local (sin push)
-      #     - UNA sola arquitectura (ubuntu runner = amd64)
-      #     - load:true => imagen disponible local://
-      #     - SIN attestations (provenance/sbom) para evitar conflictos con --load
-     # -------------------------
-      - name: Build (PR -> local image)
-        if: github.event_name == 'pull_request'
-        id: build_pr
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          pull: true
-          load: true
-          tags: ${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: false
-          sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # -------------------------
-      # 6B) Build+Push en main/tags: multi-arch a registry
-      #     - Attestations ON para Scout por digest
-      # -------------------------
+      # Build+Push multi-arch y con attestation (SBOM/provenance)
       - name: Build & Push (main/tags -> registry)
         if: github.event_name != 'pull_request'
         id: build
@@ -141,16 +127,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # -------------------------
-      # 7) Docker Scout SOLO en main/tags
-      #    Motivo: en PR te fallaba por entitlement (“githubactions not entitled…”)
-      #    Política:
-      #      - only-severities: high
-      #      - only-fixed: true
-      #      - ignore-base: true (ignora CVEs del SO/base)
-      #      - only-package-types: npm (npm-only)
-      #    Se analiza por DIGEST => SIEMPRE con @
-      # -------------------------
+      # Scout SOLO en main/tags, por DIGEST (siempre con @)
+      # Política: HIGH + only-fixed + ignore-base + npm-only
       - name: "Scout CVEs (main/tags: HIGH, fixed only, npm only, ignore base)"
         if: github.event_name != 'pull_request'
         uses: docker/scout-action@v1
@@ -160,7 +138,7 @@ jobs:
           only-severities: high
           only-fixed: true
           ignore-base: true
-          onlye-types: npm
+          only-package-types: npm
           summary: true
           exit-code: true
           write-comment: false
