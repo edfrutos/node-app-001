@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
 
       # -------------------------
-      # 2) Node para npm audit (política npm-only)
+      # 2) Node para npm audit (política n
       #    Esto evita depender de Scout en PRs.
       # -------------------------
       - name: Set up Node
@@ -77,7 +77,7 @@ jobs:
       # -------------------------
       - name: Login to Docker Hub
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+       ses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -104,7 +104,7 @@ jobs:
       #     - UNA sola arquitectura (ubuntu runner = amd64)
       #     - load:true => imagen disponible local://
       #     - SIN attestations (provenance/sbom) para evitar conflictos con --load
-      # -------------------------
+     # -------------------------
       - name: Build (PR -> local image)
         if: github.event_name == 'pull_request'
         id: build_pr
@@ -160,7 +160,7 @@ jobs:
           only-severities: high
           only-fixed: true
           ignore-base: true
-          only-package-types: npm
+          onlye-types: npm
           summary: true
           exit-code: true
           write-comment: false
