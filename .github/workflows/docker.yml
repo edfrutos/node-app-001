@@ -62,7 +62,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       # Build Docker en PR (sin push, una sola arquitectura)
-      # Nota: NO usamos --load ni attestations aquí para evitar errores de exporter.
+      # Nota: NO usamos cache-to porque el driver docker no lo soporta sin push
       - name: Docker build (PR, no push)
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
@@ -74,7 +74,6 @@ jobs:
           provenance: false
           sbom: false
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # ==========================================================
       # main/tags: build+push multi-arch + Scout (npm-only)
