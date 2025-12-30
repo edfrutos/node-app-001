@@ -42,9 +42,15 @@ jobs:
 
       # ==========================================================
       # PR: política "npm-only" REALISTA (sin Docker Scout)
-      # - Ejecuta npm audit (prod only) y construye Docker (amd64)
-      # - Así NO dependes de Docker Scout entitlement en PR
+      # - npm audit (prod only) + docker build (amd64)
+      # - No depende de entitlement de Docker Scout en PR
       # ==========================================================
+
+      # Buildx también en PR para evitar comportamientos inconsistentes
+      - name: Set up Docker Buildx (PR)
+        if: github.event_name == 'pull_request'
+        uses: docker/setup-buildx-action@v3
+
       - name: Set up Node (PR)
         if: github.event_name == 'pull_request'
         uses: actions/setup-node@v4
@@ -62,7 +68,6 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       # Build Docker en PR (sin push, una sola arquitectura)
-      # Nota: NO usamos cache-to porque el driver docker no lo soporta sin push
       - name: Docker build (PR, no push)
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
@@ -73,7 +78,6 @@ jobs:
           push: false
           provenance: false
           sbom: false
-          cache-from: type=gha
 
       # ==========================================================
       # main/tags: build+push multi-arch + Scout (npm-only)
