@@ -4,8 +4,9 @@
   "description": "Node Base Template",
   "private": true,
   "type": "commonjs",
-  "main": "server.js",
+  "main": "src/server.js",
   "scripts": {
+    "start": "node src/server.js",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major"
@@ -14,9 +15,14 @@
   "dependencies": {
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
+    "helmet": "^7.1.0",
     "tar": "^7.5.2"
   },
   "overrides": {
     "glob": "11.1.0"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
