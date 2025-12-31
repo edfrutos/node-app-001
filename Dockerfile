@@ -28,17 +28,27 @@ WORKDIR /app
 # Copiamos la app ya construida
 COPY --from=builder /app /app
 
-# 🔥 Eliminamos npm y herramientas innecesarias
+# 🔥 Eliminamos npm y herramientas innecesarias + permisos
 RUN rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx \
   && chown -R app:app /app
+
+# Build info (inyectable en build)
+ARG APP_VERSION=dev
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+
+ENV APP_NAME=node-app-001 \
+    APP_VERSION=$APP_VERSION \
+    GIT_SHA=$GIT_SHA \
+    BUILD_DATE=$BUILD_DATE \
+    NODE_ENV=production
 
 USER app
 
 EXPOSE 3000
 
-# Healthcheck simple y fiable
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["node", "src/server.js"]
