@@ -1,17 +1,22 @@
 name: build-and-scout
 
 on:
+  # CI en main + releases semver
   push:
     branches: ["main"]
     tags: ["v*.*.*"]
+  # Validación en PRs contra main
   pull_request:
     branches: ["main"]
+  # Ejecución manual
   workflow_dispatch:
 
+# Evita ejecuciones simultáneas del mismo ref
 concurrency:
   group: build-and-scout-${{ github.ref }}
   cancel-in-progress: true
 
+# Permisos mínimos (para leer repo y, si algún día lo habilitas, comentar en PR)
 permissions:
   contents: read
   pull-requests: write
@@ -25,11 +30,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------
+      # 1) Checkout
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
       # ==========================================================
-      # PR: gate "npm-only" + build docker sin push (rápido/fiable)
+      # PR: política "npm-only" (realista) + build docker sin push
+      # - No depende de Docker Scout (evita problemas de entitlement)
+      # - Gate: tests + audit (prod only, high)
       # ==========================================================
       - name: Set up Node (PR)
         if: github.event_name == 'pull_request'
@@ -41,6 +51,10 @@ jobs:
       - name: Install dependencies (PR)
         if: github.event_name == 'pull_request'
         run: npm ci
+
+      - name: Run tests (PR)
+        if: github.event_name == 'pull_request'
+        run: npm test
 
       - name: npm audit (PR, prod only, fail on high)
         if: github.event_name == 'pull_request'
@@ -64,6 +78,21 @@ jobs:
       # ==========================================================
       # main/tags: build+push multi-arch + SBOM/provenance + Scout
       # ==========================================================
+      - name: Set up Node (main/tags)
+        if: github.event_name != 'pull_request'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies (main/tags)
+        if: github.event_name != 'pull_request'
+        run: npm ci
+
+      - name: Run tests (main/tags)
+        if: github.event_name != 'pull_request'
+        run: npm test
+
       - name: Set up QEMU (main/tags)
         if: github.event_name != 'pull_request'
         uses: docker/setup-qemu-action@v3
@@ -86,7 +115,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
+            # Tag exacto cuando llega vX.Y.Z
             type=ref,event=tag
+            # latest sólo en main
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.source=${{ github.repositoryUrl }}
@@ -103,6 +134,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Attestations para Scout (SBOM + provenance)
           provenance: true
           sbom: true
           cache-from: type=gha
@@ -117,7 +149,7 @@ jobs:
           only-severities: high
           only-fixed: true
           ignore-base: true
-          only-package-types: npm
+          only-package-types: npm   # ← AQUÍ
           summary: true
           exit-code: true
           write-comment: false

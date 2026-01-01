@@ -40,4 +40,14 @@ app.post("/echo", (req, res) => {
   res.json({ received: req.body });
 });
 
-module.exports = app;
+let isReady = true;
+
+app.get("/ready", (_req, res) => {
+  res.status(isReady ? 200 : 503).json({ ready: isReady });
+});
+
+function setReady(v) {
+  isReady = v;
+}
+
+module.exports = { app, setReady };
