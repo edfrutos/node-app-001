@@ -9,7 +9,8 @@
     "start": "node src/server.js",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
-    "release:major": "./scripts/release.sh major"
+    "release:major": "./scripts/release.sh major",
+    "test": "jest"
   },
   "license": "ISC",
   "dependencies": {
@@ -25,5 +26,8 @@
   "devDependencies": {
     "jest": "^30.2.0",
     "supertest": "^7.1.4"
+  },
+  "jest": {
+    "testEnvironment": "node"
   }
 }
