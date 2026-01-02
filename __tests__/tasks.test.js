@@ -27,7 +27,7 @@ describe("Tasks API", () => {
 
     const res = await request(app).patch(`/tasks/${id}`).send({ done: true });
     expect(res.statusCode).toBe(200);
-    expect(rs.body.done).toBe(true);
+    expect(res.body.done).toBe(true);
   });
 
   test("DELETE /tasks/:id -> 204 y luego 404", async () => {
