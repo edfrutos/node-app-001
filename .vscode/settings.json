@@ -1,4 +1,20 @@
 {
-  "json.schemaDownload.enable": true,
-  "workbench.externalBrowser": "chrome"
+  "mssql.disableIntelliSense": true,
+  "mssql.validate": false,
+  "mssql.enableIntelliSense": false,
+  "files.associations": {
+    "schema.sql": "sqlite",
+    "**/db/*.sql": "sqlite"
+  },
+  "[sql]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    },
+    "editor.suggest.showWords": false
+  },
+  "sql.validate.enable": false
 }

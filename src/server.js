@@ -1,4 +1,7 @@
 const { app, setReady } = require("./app");
+const { initDb } = require("./db");
+
+initDb();
 
 const PORT = process.env.PORT || 3000;
 

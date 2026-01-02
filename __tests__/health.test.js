@@ -1,36 +1,49 @@
+// __tests__/tasks.test.js
 const request = require("supertest");
 const { app } = require("../src/app");
+const tasksService = require("../src/services/tasks.service");
+const { initDb } = require("../src/db");
 
-describe("Endpoints básicos", () => {
-  test("GET /health -> 200 y status ok", async () => {
-    const res = await request(app).get("/health");
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty("status", "ok");
+describe("Tasks API", () => {
+  beforeAll(() => {
+    initDb();
   });
 
-  test("GET /version -> 200 y campos básicos", async () => {
-    const res = await request(app).get("/version");
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty("name");
-    expect(res.body).toHaveProperty("version");
-    expect(res.body).toHaveProperty("gitSha");
-    expect(res.body).toHaveProperty("buildDate");
+  beforeEach(async () => {
+    await tasksService._reset();
   });
 
-  test("GET /ready -> 200 y ready true", async () => {
-    const res = await request(app).get("/ready");
-    expect(res.status).toBe(200);
-    expect(res.body.ready).toBe(true);
+  test("GET /tasks -> lista vacía", async () => {
+    const res = await request(app).get("/tasks");
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ items: [] });
   });
 
-  test("POST /echo -> devuelve lo recibido", async () => {
-    const payload = { hola: "mundo" };
-    const res = await request(app)
-      .post("/echo")
-      .set("content-type", "application/json")
-      .send(payload);
+  test("POST /tasks -> crea tarea", async () => {
+    const res = await request(app).post("/tasks").send({ title: "Comprar pan" });
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toHaveProperty("id");
+    expect(res.body.title).toBe("Comprar pan");
+    expect(res.body.done).toBe(false);
+  });
 
+  test("PATCH /tasks/:id -> actualiza done", async () => {
+    const created = await request(app).post("/tasks").send({ title: "T1" });
+    const { id } = created.body;
+
+    const res = await request(app).patch(`/tasks/${id}`).send({ done: true });
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ received: payload });
+    expect(res.body.done).toBe(true);
+  });
+
+  test("DELETE /tasks/:id -> 204", async () => {
+    const created = await request(app).post("/tasks").send({ title: "T1" });
+    const { id } = created.body;
+
+    const del = await request(app).delete(`/tasks/${id}`);
+    expect(del.statusCode).toBe(204);
+
+    const get = await request(app).get(`/tasks/${id}`);
+    expect(get.statusCode).toBe(404);
   });
 });

@@ -50,4 +50,10 @@ function setReady(v) {
   isReady = v;
 }
 
+const tasksRouter = require("./routes/tasks.routes");
+app.use("/tasks", tasksRouter);
+
+const errorMiddleware = require("./middleware/error.middleware");
+app.use(errorMiddleware);
+
 module.exports = { app, setReady };
