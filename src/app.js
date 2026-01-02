@@ -40,4 +40,20 @@ app.post("/echo", (req, res) => {
   res.json({ received: req.body });
 });
 
-module.exports = app;
+let isReady = true;
+
+app.get("/ready", (_req, res) => {
+  res.status(isReady ? 200 : 503).json({ ready: isReady });
+});
+
+function setReady(v) {
+  isReady = v;
+}
+
+const tasksRouter = require("./routes/tasks.routes");
+app.use("/tasks", tasksRouter);
+
+const errorMiddleware = require("./middleware/error.middleware");
+app.use(errorMiddleware);
+
+module.exports = { app, setReady };

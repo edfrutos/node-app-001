@@ -42,8 +42,9 @@ ENV APP_NAME=node-app-001 \
     APP_VERSION=$APP_VERSION \
     GIT_SHA=$GIT_SHA \
     BUILD_DATE=$BUILD_DATE \
-    NODE_ENV=production
-
+    NODE_ENV=production \
+    DB_PATH=/app/data/tasks.sqlite
+    
 USER app
 
 EXPOSE 3000
