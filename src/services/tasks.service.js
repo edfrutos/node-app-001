@@ -2,17 +2,17 @@
 const repo = require("../repositories/tasks.repo.sqlite");
 
 function httpError(statusCode, message) {
-  const e = new Error(message);
-  e.statusCode = statusCode;
-  return e;
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
 }
-
 function badRequest(message) {
   return httpError(400, message);
 }
-
-function notFound(message) {
-  return httpError(404, message);
+function normalizeId(id) {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) throw badRequest("id must be a positive integer");
+  return n;
 }
 
 async function list() {
@@ -21,15 +21,13 @@ async function list() {
 }
 
 async function getById(id) {
-  const item = await repo.getById(id);
-  if (!item) throw notFound("task not found");
-  return item;
+  return repo.getById(normalizeId(id));
 }
 
 async function create(payload) {
-  if (!payload || typeof payload.title !== "string") {
-    throw badRequest("title is required");
-  }
+  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
+  if (typeof payload.title !== "string") throw badRequest("title is required");
+
   const title = payload.title.trim();
   if (!title) throw badRequest("title cannot be empty");
 
@@ -37,37 +35,37 @@ async function create(payload) {
 }
 
 async function patch(id, payload) {
-  if (!payload || typeof payload !== "object") {
-    throw badRequest("payload is required");
-  }
+  const taskId = normalizeId(id);
+  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
 
   const updates = {};
 
-  if ("title" in payload) {
+  if (Object.prototype.hasOwnProperty.call(payload, "title")) {
     if (typeof payload.title !== "string") throw badRequest("title must be string");
-    const t = payload.title.trim();
-    if (!t) throw badRequest("title cannot be empty");
-    updates.title = t;
+    const title = payload.title.trim();
+    if (!title) throw badRequest("title cannot be empty");
+    updates.title = title;
   }
 
-  if ("done" in payload) {
+  if (Object.prototype.hasOwnProperty.call(payload, "done")) {
     if (typeof payload.done !== "boolean") throw badRequest("done must be boolean");
     updates.done = payload.done;
   }
 
-  const updated = await repo.update(id, updates);
-  if (!updated) throw notFound("task not found");
-  return updated;
+  if (Object.keys(updates).length === 0) throw badRequest("no valid fields to update");
+
+  return repo.update(taskId, updates);
 }
 
 async function remove(id) {
-  const ok = await repo.remove(id);
-  if (!ok) throw notFound("task not found");
-  return true;
+  return repo.remove(normalizeId(id));
 }
 
-// Solo tests
+// SOLO TESTS
 async function _reset() {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("_reset is test-only");
+  }
   await repo._reset();
 }
 

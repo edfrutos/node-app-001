@@ -43,8 +43,14 @@ ENV APP_NAME=node-app-001 \
     GIT_SHA=$GIT_SHA \
     BUILD_DATE=$BUILD_DATE \
     NODE_ENV=production \
-    DB_PATH=/app/data/tasks.sqlite
-    
+    DB_PATH=/app/data/tasks.sqlite \
+    DB_FILE=/app/data/tasks.sqlite
+
+RUN mkdir -p /app/data \
+   && chown -R app:app /app/data
+
+VOLUME ["/app/data"]
+
 USER app
 
 EXPOSE 3000
