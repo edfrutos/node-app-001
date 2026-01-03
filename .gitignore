@@ -9,3 +9,6 @@ node_modules/
 .env
 README.old.md
 README.old2.md
+
+# runtime data
+/data/
