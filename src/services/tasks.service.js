@@ -1,97 +1,74 @@
-const { db } = require("../db");
+// src/services/tasks.service.js
+const repo = require("../repositories/tasks.repo.sqlite");
 
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+function httpError(statusCode, message) {
+  const e = new Error(message);
+  e.statusCode = statusCode;
+  return e;
 }
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
+function badRequest(message) {
+  return httpError(400, message);
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+function notFound(message) {
+  return httpError(404, message);
 }
 
-function mapTask(row) {
-  if (!row) return null;
-  return {
-    ...row,
-    done: Boolean(row.done),
-  };
-}
-
-async function list({ done } = {}) {
-  let rows;
-  if (done === undefined) {
-    rows = await all("SELECT * FROM tasks ORDER BY id DESC");
-  } else {
-    rows = await all("SELECT * FROM tasks WHERE done = ? ORDER BY id DESC", [done ? 1 : 0]);
-  }
-  return (rows || []).map(mapTask);
+async function list() {
+  const items = await repo.list();
+  return { items };
 }
 
 async function getById(id) {
-  const row = await get("SELECT * FROM tasks WHERE id = ?", [id]);
-  return mapTask(row);
+  const item = await repo.getById(id);
+  if (!item) throw notFound("task not found");
+  return item;
 }
 
-async function create({ title, done = false }) {
-  const now = new Date().toISOString();
-  const r = await run(
-    "INSERT INTO tasks (title, done, created_at, updated_at) VALUES (?, ?, ?, ?)",
-    [title, done ? 1 : 0, now, now]
-  );
-  const row = await get("SELECT * FROM tasks WHERE id = ?", [r.lastID]);
-  return mapTask(row);
+async function create(payload) {
+  if (!payload || typeof payload.title !== "string") {
+    throw badRequest("title is required");
+  }
+  const title = payload.title.trim();
+  if (!title) throw badRequest("title cannot be empty");
+
+  return repo.create({ title });
 }
 
-async function update(id, { title, done }) {
-  const now = new Date().toISOString();
-  // Construcción dinámica segura
-  const fields = [];
-  const params = [];
-
-  if (title !== undefined) {
-    fields.push("title = ?");
-    params.push(title);
+async function patch(id, payload) {
+  if (!payload || typeof payload !== "object") {
+    throw badRequest("payload is required");
   }
-  if (done !== undefined) {
-    fields.push("done = ?");
-    params.push(done ? 1 : 0);
+
+  const updates = {};
+
+  if ("title" in payload) {
+    if (typeof payload.title !== "string") throw badRequest("title must be string");
+    const t = payload.title.trim();
+    if (!t) throw badRequest("title cannot be empty");
+    updates.title = t;
   }
-  fields.push("updated_at = ?");
-  params.push(now);
 
-  params.push(id);
+  if ("done" in payload) {
+    if (typeof payload.done !== "boolean") throw badRequest("done must be boolean");
+    updates.done = payload.done;
+  }
 
-  await run(`UPDATE tasks SET ${fields.join(", ")} WHERE id = ?`, params);
-  const row = await get("SELECT * FROM tasks WHERE id = ?", [id]);
-  return mapTask(row);
+  const updated = await repo.update(id, updates);
+  if (!updated) throw notFound("task not found");
+  return updated;
 }
 
 async function remove(id) {
-  const r = await run("DELETE FROM tasks WHERE id = ?", [id]);
-  return r.changes > 0;
+  const ok = await repo.remove(id);
+  if (!ok) throw notFound("task not found");
+  return true;
 }
 
-// Solo para tests (no usar en prod)
+// Solo tests
 async function _reset() {
-  await run("DELETE FROM tasks");
+  await repo._reset();
 }
 
-module.exports = { list, getById, create, update, remove, _reset };
+module.exports = { list, getById, create, patch, remove, _reset };
