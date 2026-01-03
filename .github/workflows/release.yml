@@ -1,53 +1,89 @@
-name: release-tag-and-github-release
+name: github-release
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    tags:
+      - "v*"
 
+# Necesario para consultar runs de otros workflows y crear el release
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  tag-and-release:
+  create-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Wait for build-and-scout success for this tag
+        id: gate
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tag = context.ref.replace('refs/tags/', '');
+            const sha = context.sha;
 
-      - name: Read version from package.json
-        id: ver
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+            // 1) Encuentra el workflow "build-and-scout" (por nombre)
+            const workflows = await github.rest.actions.listRepoWorkflows({ owner, repo });
+            const wf = workflows.data.workflows.find(w => w.name === 'build-and-scout');
+            if (!wf) {
+              core.setFailed('No encuentro el workflow "build-and-scout" en este repo.');
+              return;
+            }
 
-      - name: Check if tag exists
-        id: check
-        run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+            // 2) Poll hasta que exista un run para este SHA y termine
+            const maxAttempts = 30;          // ~10 min
+            const delayMs = 20_000;          // 20s
 
-      - name: Create annotated tag
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          git tag -a "$TAG" -m "$TAG"
-          git push origin "$TAG"
+            function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+            let lastConclusion = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const runsResp = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: wf.id,
+                per_page: 30,
+              });
+
+              const run = runsResp.data.workflow_runs.find(r => r.head_sha === sha);
+              if (!run) {
+                core.info(`[gate] (${attempt}/${maxAttempts}) Aún no hay run de build-and-scout para sha=${sha}. Espero...`);
+                await sleep(delayMs);
+                continue;
+              }
+
+              core.info(`[gate] Encontrado run id=${run.id} status=${run.status} conclusion=${run.conclusion}`);
+
+              if (run.status !== 'completed') {
+                core.info(`[gate] (${attempt}/${maxAttempts}) build-and-scout aún en progreso. Espero...`);
+                await sleep(delayMs);
+                continue;
+              }
+
+              lastConclusion = run.conclusion;
+              if (run.conclusion !== 'success') {
+                core.setFailed(`build-and-scout no fue success (conclusion=${run.conclusion}). No creo el release ${tag}.`);
+                return;
+              }
+
+              // OK
+              core.setOutput('tag', tag);
+              core.setOutput('sha', sha);
+              core.setOutput('run_url', run.html_url);
+              core.info(`[gate] OK ✅ build-and-scout success. Continuamos a crear el release ${tag}.`);
+              return;
+            }
+
+            core.setFailed(`Timeout esperando a build-and-scout para sha=${sha} (última conclusion=${lastConclusion}).`);
 
       - name: Create GitHub Release
-        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          name: ${{ steps.ver.outputs.tag }}
+          tag_name: ${{ steps.gate.outputs.tag }}
+          target_commitish: ${{ steps.gate.outputs.sha }}
           generate_release_notes: true
           draft: false
           prerelease: false
