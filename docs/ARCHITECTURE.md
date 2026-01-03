@@ -51,3 +51,12 @@ Plantilla Node.js profesional con:
 - [ ] Config por entorno
 - [ ] Migraciones DB
 - [ ] Observabilidad
+
+•2026-01-03 — App sin side-effects
+
+  •app.js sin DB init
+
+  •server.js gestiona initDb + señales + cierre
+
+  •tests con DB_FILE=:memory:
+

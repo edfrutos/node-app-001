@@ -2,8 +2,6 @@
 const express = require("express");
 const helmet = require("helmet");
 
-const { initDb } = require("./db");
-
 const app = express();
 
 app.use(helmet());
@@ -14,9 +12,7 @@ const APP_VERSION = process.env.APP_VERSION || "dev";
 const GIT_SHA = process.env.GIT_SHA || "unknown";
 const BUILD_DATE = process.env.BUILD_DATE || "unknown";
 
-app.get("/", (_req, res) => {
-  res.type("text").send("OK");
-});
+app.get("/", (_req, res) => res.type("text").send("OK"));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -31,30 +27,22 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/version", (_req, res) => {
-  res.json({
-    name: APP_NAME,
-    version: APP_VERSION,
-    gitSha: GIT_SHA,
-    buildDate: BUILD_DATE,
-  });
+  res.json({ name: APP_NAME, version: APP_VERSION, gitSha: GIT_SHA, buildDate: BUILD_DATE });
 });
 
-app.post("/echo", (req, res) => {
-  res.json({ received: req.body });
-});
+app.post("/echo", (req, res) => res.json({ received: req.body }));
 
-// Tasks
+// readiness
+let isReady = true;
+function setReady(v) { isReady = Boolean(v); }
+app.get("/ready", (_req, res) => res.status(isReady ? 200 : 503).json({ ready: isReady }));
+
+// routes
 const tasksRouter = require("./routes/tasks.routes");
 app.use("/tasks", tasksRouter);
 
-// Error middleware AL FINAL
+// error middleware AL FINAL
 const errorMiddleware = require("./middleware/error.middleware");
 app.use(errorMiddleware);
 
-// Inicializa DB (idempotente)
-initDb().catch((e) => {
-  console.error("DB init failed:", e);
-  process.exit(1);
-});
-
-module.exports = app;
+module.exports = { app, setReady };

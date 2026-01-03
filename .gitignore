@@ -12,3 +12,5 @@ README.old2.md
 
 # runtime data
 /data/
+/data/
+*.sqlite
