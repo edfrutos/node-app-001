@@ -8,9 +8,11 @@
 node_modules/
 .env
 README.old.md
-README.old2.md
+README.old2.node_modules
 
-# runtime data
-/data/
-/data/
+# local data / sqlite
+data/
 *.sqlite
+*.db
+src/db/tasks.sqlite
+src/tasks.sqlite
