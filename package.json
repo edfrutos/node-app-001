@@ -1,6 +1,6 @@
 {
   "name": "node-app-001",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node Base Template",
   "private": true,
   "type": "commonjs",
@@ -9,7 +9,6 @@
     "start": "node src/server.js",
     "test": "DB_FILE=:memory: jest --runInBand",
     "smoke": "node scripts/smoke.cjs",
-
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major"
