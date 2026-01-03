@@ -1,7 +1,8 @@
 // src/repositories/tasks.repo.sqlite.js
 const { db, initDb } = require("../db");
 
-function run(sql, params = []) {
+async function run(sql, params = []) {
+  await initDb();
   return new Promise((resolve, reject) => {
     db.run(sql, params, function (err) {
       if (err) return reject(err);
@@ -10,20 +11,22 @@ function run(sql, params = []) {
   });
 }
 
-function get(sql, params = []) {
+async function get(sql, params = []) {
+  await initDb();
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
       if (err) return reject(err);
-      resolve(row);
+      resolve(row || null);
     });
   });
 }
 
-function all(sql, params = []) {
+async function all(sql, params = []) {
+  await initDb();
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) return reject(err);
-      resolve(rows);
+      resolve(rows || []);
     });
   });
 }

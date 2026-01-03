@@ -34,16 +34,11 @@ function open() {
 
 function migrate() {
   const d = open();
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      done INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
-  `);
+  const path = require("path");
+  const fs = require("fs");
+  const schemaPath = path.join(__dirname, "schema.sql");
+  const schema = fs.readFileSync(schemaPath, "utf8");
+  d.exec(schema);
 }
 
 function close() {
