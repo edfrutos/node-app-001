@@ -56,6 +56,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm test
 
+      - name: Smoke (PR)
+        if: github.event_name == 'pull_request'
+        run: npm run smoke
+
+      - name: Smoke (PR)
+        if: github.event_name == 'pull_request'
+        run: npm run smoke
+
       - name: npm audit (PR, prod only, fail on high)
         if: github.event_name == 'pull_request'
         run: npm audit --omit=dev --audit-level=high
@@ -92,6 +100,18 @@ jobs:
       - name: Run tests (main/tags)
         if: github.event_name != 'pull_request'
         run: npm test
+
+      - name: Smoke (main/tags)
+        if: github.event_name != 'pull_request'
+        run: npm run smoke
+
+      - name: Smoke (main/tags)
+        if: github.event_name != 'pull_request'
+        run: npm run smoke
+
+      - name: Smoke (PR)
+        if: github.event_name == 'pull_request'
+        run: npm run smoke
 
       - name: Set up QEMU (main/tags)
         if: github.event_name != 'pull_request'

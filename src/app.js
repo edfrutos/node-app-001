@@ -1,5 +1,8 @@
+// src/app.js
 const express = require("express");
 const helmet = require("helmet");
+
+const { initDb } = require("./db");
 
 const app = express();
 
@@ -40,20 +43,18 @@ app.post("/echo", (req, res) => {
   res.json({ received: req.body });
 });
 
-let isReady = true;
-
-app.get("/ready", (_req, res) => {
-  res.status(isReady ? 200 : 503).json({ ready: isReady });
-});
-
-function setReady(v) {
-  isReady = v;
-}
-
+// Tasks
 const tasksRouter = require("./routes/tasks.routes");
 app.use("/tasks", tasksRouter);
 
+// Error middleware AL FINAL
 const errorMiddleware = require("./middleware/error.middleware");
 app.use(errorMiddleware);
 
-module.exports = { app, setReady };
+// Inicializa DB (idempotente)
+initDb().catch((e) => {
+  console.error("DB init failed:", e);
+  process.exit(1);
+});
+
+module.exports = app;

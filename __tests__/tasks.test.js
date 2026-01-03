@@ -1,38 +1,41 @@
+// __tests__/tasks.test.js
+process.env.DB_PATH = ":memory:";
+
 const request = require("supertest");
-const { app } = require("../src/app");
+const app = require("../src/app");
 const tasksService = require("../src/services/tasks.service");
 
 describe("Tasks API", () => {
-  beforeEach(() => {
-    tasksService._reset();
+  beforeEach(async () => {
+    await tasksService._reset();
   });
 
   test("GET /tasks -> lista vacía", async () => {
-    const res = await request(app).get("/tasks");
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ items: [] });
+    const { statusCode, body } = await request(app).get("/tasks");
+    expect(statusCode).toBe(200);
+    expect(body).toEqual({ items: [] });
   });
 
   test("POST /tasks -> crea tarea", async () => {
-    const res = await request(app).post("/tasks").send({ title: "Comprar pan" });
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toHaveProperty("id");
-    expect(res.body.title).toBe("Comprar pan");
-    expect(res.body.done).toBe(false);
+    const { statusCode, body } = await request(app).post("/tasks").send({ title: "Comprar pan" });
+    expect(statusCode).toBe(201);
+    expect(body).toHaveProperty("id");
+    expect(body.title).toBe("Comprar pan");
+    expect(body.done).toBe(false);
   });
 
   test("PATCH /tasks/:id -> actualiza done", async () => {
     const created = await request(app).post("/tasks").send({ title: "T1" });
-    const id = created.body.id;
+    const { id } = created.body;
 
-    const res = await request(app).patch(`/tasks/${id}`).send({ done: true });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.done).toBe(true);
+    const { statusCode, body } = await request(app).patch(`/tasks/${id}`).send({ done: true });
+    expect(statusCode).toBe(200);
+    expect(body.done).toBe(true);
   });
 
   test("DELETE /tasks/:id -> 204 y luego 404", async () => {
     const created = await request(app).post("/tasks").send({ title: "T1" });
-    const id = created.body.id;
+    const { id } = created.body;
 
     const del = await request(app).delete(`/tasks/${id}`);
     expect(del.statusCode).toBe(204);
