@@ -93,4 +93,63 @@ async function _reset() {
   await run("DELETE FROM tasks");
 }
 
-module.exports = { list, getById, create, update, remove, _reset };
+// --- NUEVO: count con filtros
+async function count({ done, search }) {
+  const where = [];
+  const params = [];
+
+  if (done !== undefined) {
+    where.push("done = ?");
+    params.push(done ? 1 : 0);
+  }
+
+  if (search) {
+    where.push("title LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const row = await get(`SELECT COUNT(*) AS total FROM tasks ${whereSql}`, params);
+  return row ? Number(row.total) : 0;
+}
+
+// --- NUEVO: listado paginado con filtros y orden
+async function listPaged({ offset, limit, done, search, sort, order }) {
+  const where = [];
+  const params = [];
+
+  if (done !== undefined) {
+    where.push("done = ?");
+    params.push(done ? 1 : 0);
+  }
+
+  if (search) {
+    where.push("title LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const orderSql = `ORDER BY ${sort} ${order.toUpperCase()}`;
+
+  params.push(limit);
+  params.push(offset);
+
+  const rows = await all(
+    `SELECT * FROM tasks ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
+    params
+  );
+
+  return (rows || []).map(mapTask);
+}
+
+module.exports = {
+  list,
+  getById,
+  create,
+  update,
+  remove,
+  _reset,
+  // NUEVO:
+  count,
+  listPaged,
+};

@@ -5,38 +5,89 @@ function badRequest(message) {
   return e;
 }
 
-function validateCreate(payload) {
-  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
-  if (typeof payload.title !== "string") throw badRequest("title is required");
+function toInt(value, { name, min, max, defaultValue }) {
+  if (value === undefined || value === null || value === "") return defaultValue;
+  const n = Number(value);
+  if (!Number.isInteger(n)) throw badRequest(`${name} must be an integer`);
+  if (min !== undefined && n < min) throw badRequest(`${name} must be >= ${min}`);
+  if (max !== undefined && n > max) throw badRequest(`${name} must be <= ${max}`);
+  return n;
+}
 
-  const title = payload.title.trim();
+function toBool(value, { name }) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value === true || value === false) return value;
+  const v = String(value).toLowerCase();
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  throw badRequest(`${name} must be boolean (true/false)`);
+}
+
+function toOrder(value) {
+  if (!value) return "desc";
+  const v = String(value).toLowerCase();
+  if (v === "asc" || v === "desc") return v;
+  throw badRequest("order must be asc or desc");
+}
+
+const SORT_WHITELIST = new Set(["id", "title", "done", "created_at", "updated_at"]);
+
+function toSort(value) {
+  if (!value) return "created_at";
+  const v = String(value);
+  if (!SORT_WHITELIST.has(v)) {
+    throw badRequest(`sort must be one of: ${[...SORT_WHITELIST].join(", ")}`);
+  }
+  return v;
+}
+
+function parseListQuery(query) {
+  const page = toInt(query.page, { name: "page", min: 1, defaultValue: 1 });
+  const limit = toInt(query.limit, { name: "limit", min: 1, max: 100, defaultValue: 20 });
+
+  const done = toBool(query.done, { name: "done" });
+
+  const search =
+    query.search === undefined || query.search === null
+      ? undefined
+      : String(query.search).trim() || undefined;
+
+  const sort = toSort(query.sort);
+  const order = toOrder(query.order);
+
+  return { page, limit, done, search, sort, order };
+}
+
+// (Mantengo helpers clásicos por si los usas para POST/PATCH)
+function validateCreate(body) {
+  if (!body || typeof body.title !== "string") throw badRequest("title is required");
+  const title = body.title.trim();
   if (!title) throw badRequest("title cannot be empty");
-
   return { title };
 }
 
-function validatePatch(payload) {
-  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
+function validatePatch(body) {
+  if (!body || typeof body !== "object") throw badRequest("payload is required");
 
   const updates = {};
-  let touched = false;
-
-  if ("title" in payload) {
-    touched = true;
-    if (typeof payload.title !== "string") throw badRequest("title must be string");
-    const title = payload.title.trim();
-    if (!title) throw badRequest("title cannot be empty");
-    updates.title = title;
+  if ("title" in body) {
+    if (typeof body.title !== "string") throw badRequest("title must be string");
+    const t = body.title.trim();
+    if (!t) throw badRequest("title cannot be empty");
+    updates.title = t;
   }
 
-  if ("done" in payload) {
-    touched = true;
-    if (typeof payload.done !== "boolean") throw badRequest("done must be boolean");
-    updates.done = payload.done;
+  if ("done" in body) {
+    if (typeof body.done !== "boolean") throw badRequest("done must be boolean");
+    updates.done = body.done;
   }
 
-  if (!touched) throw badRequest("no fields to update");
+  if (Object.keys(updates).length === 0) throw badRequest("no valid fields to update");
   return updates;
 }
 
-module.exports = { validateCreate, validatePatch };
+module.exports = {
+  parseListQuery,
+  validateCreate,
+  validatePatch,
+};
