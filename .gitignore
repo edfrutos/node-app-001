@@ -14,5 +14,5 @@ README.old2.node_modules
 data/
 *.sqlite
 *.db
-src/db/tasks.sqlite
-src/tasks.sqlite
+src/db/*.sqlite
+src/db/*.sqlite-*
