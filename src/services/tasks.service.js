@@ -1,72 +1,56 @@
 // src/services/tasks.service.js
 const repo = require("../repositories/tasks.repo.sqlite");
+const { parseListQuery, validateCreate, validatePatch } = require("../validators/tasks.validator");
 
-function httpError(statusCode, message) {
-  const err = new Error(message);
-  err.statusCode = statusCode;
-  return err;
-}
 function badRequest(message) {
-  return httpError(400, message);
-}
-function normalizeId(id) {
-  const n = Number(id);
-  if (!Number.isInteger(n) || n <= 0) throw badRequest("id must be a positive integer");
-  return n;
+  const e = new Error(message);
+  e.statusCode = 400;
+  return e;
 }
 
-async function list() {
-  const items = await repo.list();
-  return { items };
+// NUEVO: listado paginado + meta
+async function list(query = {}) {
+  const { page, limit, done, search, sort, order } = parseListQuery(query);
+
+  const total = await repo.count({ done, search });
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, pages);
+  const offset = (safePage - 1) * limit;
+
+  const items = await repo.listPaged({ offset, limit, done, search, sort, order });
+
+  return {
+    items,
+    meta: {
+      page: safePage,
+      limit,
+      total,
+      pages,
+    },
+  };
 }
 
 async function getById(id) {
-  return repo.getById(normalizeId(id));
+  return repo.getById(id);
 }
 
 async function create(payload) {
-  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
-  if (typeof payload.title !== "string") throw badRequest("title is required");
-
-  const title = payload.title.trim();
-  if (!title) throw badRequest("title cannot be empty");
-
+  const { title } = validateCreate(payload);
   return repo.create({ title });
 }
 
 async function patch(id, payload) {
-  const taskId = normalizeId(id);
-  if (!payload || typeof payload !== "object") throw badRequest("payload is required");
-
-  const updates = {};
-
-  if (Object.prototype.hasOwnProperty.call(payload, "title")) {
-    if (typeof payload.title !== "string") throw badRequest("title must be string");
-    const title = payload.title.trim();
-    if (!title) throw badRequest("title cannot be empty");
-    updates.title = title;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(payload, "done")) {
-    if (typeof payload.done !== "boolean") throw badRequest("done must be boolean");
-    updates.done = payload.done;
-  }
-
-  if (Object.keys(updates).length === 0) throw badRequest("no valid fields to update");
-
-  return repo.update(taskId, updates);
+  const updates = validatePatch(payload);
+  return repo.update(id, updates);
 }
 
 async function remove(id) {
-  return repo.remove(normalizeId(id));
+  return repo.remove(id);
 }
 
-// SOLO TESTS
+// para tests
 async function _reset() {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("_reset is test-only");
-  }
-  await repo._reset();
+  return repo._reset();
 }
 
 module.exports = { list, getById, create, patch, remove, _reset };
