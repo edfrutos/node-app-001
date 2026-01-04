@@ -1,6 +1,11 @@
 // src/app.js
 const express = require("express");
 const helmet = require("helmet");
+const swaggerUi = require("swagger-ui-express");
+
+const { openapi } = require("./openapi");
+const tasksRouter = require("./routes/tasks.routes");
+const errorMiddleware = require("./middleware/error.middleware");
 
 const app = express();
 
@@ -27,22 +32,57 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/version", (_req, res) => {
-  res.json({ name: APP_NAME, version: APP_VERSION, gitSha: GIT_SHA, buildDate: BUILD_DATE });
+  res.json({
+    name: APP_NAME,
+    version: APP_VERSION,
+    gitSha: GIT_SHA,
+    buildDate: BUILD_DATE,
+  });
 });
 
 app.post("/echo", (req, res) => res.json({ received: req.body }));
 
 // readiness
 let isReady = true;
-function setReady(v) { isReady = Boolean(v); }
+function setReady(v) {
+  isReady = Boolean(v);
+}
 app.get("/ready", (_req, res) => res.status(isReady ? 200 : 503).json({ ready: isReady }));
 
-// routes
-const tasksRouter = require("./routes/tasks.routes");
+// =======================
+// Docs (Swagger UI) “pro”
+// =======================
+// Control fino: separa /docs de /docs/ sin depender del strict routing global
+const docsRouter = express.Router({ strict: true });
+const swaggerUiOptions = { explorer: true };
+
+// Flag “pro”: permite desactivar la UI en prod (por defecto ON)
+// - DOCS_ENABLED=false -> desactiva /docs/ (pero mantiene /openapi.json)
+const DOCS_ENABLED = process.env.DOCS_ENABLED !== "false";
+
+// spec JSON (siempre disponible)
+docsRouter.get("/openapi.json", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(openapi);
+});
+
+// /docs -> /docs/ (canonical)
+// 308: redirect permanente (y consistente)
+docsRouter.get("/docs", (_req, res) => res.redirect(308, "/docs/"));
+
+if (DOCS_ENABLED) {
+  // /docs/ (HTML + assets)
+  docsRouter.use("/docs/", swaggerUi.serve, swaggerUi.setup(openapi, swaggerUiOptions));
+} else {
+  docsRouter.get("/docs/", (_req, res) => res.status(404).type("text").send("Docs disabled"));
+}
+
+app.use(docsRouter);
+
+// API routes
 app.use("/tasks", tasksRouter);
 
 // error middleware AL FINAL
-const errorMiddleware = require("./middleware/error.middleware");
 app.use(errorMiddleware);
 
 module.exports = { app, setReady };
