@@ -34,21 +34,22 @@ describe("Tasks API", () => {
   });
 
   test("GET /tasks?done=false -> filtra por done", async () => {
-    const a = await request(app).post("/tasks").send({ title: "T1" });
-    const id = a.body.id;
+    const { body: { id } } = await request(app).post("/tasks").send({ title: "T1" });
 
     await request(app).patch(`/tasks/${id}`).send({ done: true });
 
     const res = await request(app).get("/tasks?done=false");
     expect(res.statusCode).toBe(200);
-    expect(res.body.items.find(x => x.id === id)).toBeUndefined();
+    expect(res.body.items.find((x) => x.id === id)).toBeUndefined();
   });
 
   test("PATCH /tasks/:id -> actualiza done", async () => {
     const created = await request(app).post("/tasks").send({ title: "T1" });
     const { id } = created.body;
 
-    const res = await request(app).patch(`/tasks/${id}`).send({ done: true });
+    const res = await request(app)
+      .patch(`/tasks/${id}`)
+      .send({ done: true });
     expect(res.statusCode).toBe(200);
     expect(res.body.done).toBe(true);
   });
