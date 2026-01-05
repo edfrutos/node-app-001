@@ -5,6 +5,7 @@ const swaggerUi = require("swagger-ui-express");
 
 const { openapi } = require("./openapi");
 const tasksRouter = require("./routes/tasks.routes");
+const { notFound } = require("./errors/httpError");
 const errorMiddleware = require("./middleware/error.middleware");
 
 const app = express();
@@ -81,6 +82,11 @@ app.use(docsRouter);
 
 // API routes
 app.use("/tasks", tasksRouter);
+
+// 404 JSON (para rutas no existentes)
+app.use((req, _res, next) => {
+  next(notFound(`Route not found: ${req.method} ${req.path}`));
+});
 
 // error middleware AL FINAL
 app.use(errorMiddleware);
