@@ -12,6 +12,13 @@ function badRequest(message) {
 async function list(query = {}) {
   const { page, limit, done, search, sort, order } = parseListQuery(query);
 
+  // Preferimos delegar en el repo para tener un "control fino" consistente
+  // (validación/normalización de sort/order/paginación + meta).
+  if (typeof repo.listWithMeta === "function") {
+    return repo.listWithMeta({ page, limit, done, search, sort, order });
+  }
+
+  // Fallback (compatibilidad): lógica anterior si el repo aún no tiene listWithMeta()
   const total = await repo.count({ done, search });
   const pages = Math.max(1, Math.ceil(total / limit));
   const safePage = Math.min(page, pages);
@@ -26,6 +33,8 @@ async function list(query = {}) {
       limit,
       total,
       pages,
+      sort,
+      order,
     },
   };
 }

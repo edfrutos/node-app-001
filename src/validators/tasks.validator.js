@@ -18,8 +18,13 @@ function toBool(value, { name }) {
   if (value === undefined || value === null || value === "") return undefined;
   if (value === true || value === false) return value;
   const v = String(value).toLowerCase();
-  if (v === "true" || v === "1") return true;
-  if (v === "false" || v === "0") return false;
+
+  // Truthy
+  if (v === "true" || v === "1" || v === "yes" || v === "y" || v === "on") return true;
+
+  // Falsy
+  if (v === "false" || v === "0" || v === "no" || v === "n" || v === "off") return false;
+
   throw badRequest(`${name} must be boolean (true/false)`);
 }
 
@@ -86,8 +91,13 @@ function validatePatch(body) {
   return updates;
 }
 
+function parseId(value, { name = "id" } = {}) {
+  return toInt(value, { name, min: 1 });
+}
+
 module.exports = {
   parseListQuery,
+  parseId,
   validateCreate,
   validatePatch,
 };

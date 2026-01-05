@@ -1,6 +1,58 @@
 // src/repositories/tasks.repo.sqlite.js
 const { db, initDb } = require("../db");
 
+// sorting/ordering allowlist to prevent SQL injection
+const SORT_WHITELIST = new Set(["id", "title", "done", "created_at", "updated_at"]);
+
+function normalizeListOptions(opts = {}) {
+  const page = Math.max(1, Number(opts.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Number(opts.limit ?? 20)));
+
+  const rawSearch = typeof opts.search === "string" ? opts.search.trim() : "";
+  const search = rawSearch.length ? rawSearch : "";
+
+  // done can come as boolean, "true"/"false", 1/0
+  let done;
+  if (opts.done !== undefined && opts.done !== null && opts.done !== "") {
+    if (opts.done === true || opts.done === false) {
+      done = opts.done;
+    } else {
+      const s = String(opts.done).toLowerCase();
+      if (s === "true" || s === "1") done = true;
+      else if (s === "false" || s === "0") done = false;
+      else done = undefined;
+    }
+  }
+
+  const sortRaw = String(opts.sort ?? "created_at");
+  const sort = SORT_WHITELIST.has(sortRaw) ? sortRaw : "created_at";
+
+  const orderRaw = String(opts.order ?? "desc").toLowerCase();
+  const order = orderRaw === "asc" ? "asc" : "desc";
+
+  const offset = Math.max(0, Number(opts.offset ?? (page - 1) * limit));
+
+  return { page, limit, offset, search, done, sort, order };
+}
+
+function buildWhere({ done, search }) {
+  const where = [];
+  const params = [];
+
+  if (done !== undefined) {
+    where.push("done = ?");
+    params.push(done ? 1 : 0);
+  }
+
+  if (search) {
+    where.push("title LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  return { whereSql, params };
+}
+
 async function run(sql, params = []) {
   await initDb();
   return new Promise((resolve, reject) => {
@@ -93,53 +145,51 @@ async function _reset() {
   await run("DELETE FROM tasks");
 }
 
-// --- NUEVO: count con filtros
-async function count({ done, search }) {
-  const where = [];
-  const params = [];
+// --- NUEVO: count con filtros (con normalización)
+async function count(opts = {}) {
+  await initDb();
+  const o = normalizeListOptions(opts);
+  const { whereSql, params } = buildWhere(o);
 
-  if (done !== undefined) {
-    where.push("done = ?");
-    params.push(done ? 1 : 0);
-  }
-
-  if (search) {
-    where.push("title LIKE ?");
-    params.push(`%${search}%`);
-  }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const row = await get(`SELECT COUNT(*) AS total FROM tasks ${whereSql}`, params);
   return row ? Number(row.total) : 0;
 }
 
-// --- NUEVO: listado paginado con filtros y orden
-async function listPaged({ offset, limit, done, search, sort, order }) {
-  const where = [];
-  const params = [];
+// --- NUEVO: listado paginado con filtros y orden (con control fino)
+async function listPaged(opts = {}) {
+  await initDb();
+  const o = normalizeListOptions(opts);
+  const { whereSql, params } = buildWhere(o);
 
-  if (done !== undefined) {
-    where.push("done = ?");
-    params.push(done ? 1 : 0);
-  }
-
-  if (search) {
-    where.push("title LIKE ?");
-    params.push(`%${search}%`);
-  }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  const orderSql = `ORDER BY ${sort} ${order.toUpperCase()}`;
-
-  params.push(limit);
-  params.push(offset);
+  // sort/order are validated via allowlist
+  const orderSql = `ORDER BY ${o.sort} ${o.order.toUpperCase()}`;
 
   const rows = await all(
     `SELECT * FROM tasks ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
-    params
+    [...params, o.limit, o.offset]
   );
 
   return (rows || []).map(mapTask);
+}
+
+// --- NUEVO: listado + meta (total/pages) en una sola llamada de repo
+async function listWithMeta(opts = {}) {
+  const o = normalizeListOptions(opts);
+  const total = await count(o);
+  const pages = total === 0 ? 0 : Math.ceil(total / o.limit);
+  const items = await listPaged(o);
+
+  return {
+    items,
+    meta: {
+      page: o.page,
+      limit: o.limit,
+      total,
+      pages,
+      sort: o.sort,
+      order: o.order,
+    },
+  };
 }
 
 module.exports = {
@@ -152,4 +202,5 @@ module.exports = {
   // NUEVO:
   count,
   listPaged,
+  listWithMeta,
 };

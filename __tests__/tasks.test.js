@@ -48,6 +48,31 @@ describe("Tasks API", () => {
     expect(body.items.find((x) => x.id === id)).toBeUndefined();
   });
 
+  test("GET /tasks?done=0 (string) -> equivale a false", async () => {
+    const {
+      body: { id },
+    } = await request(app).post("/tasks").send({ title: "T1" });
+
+    await request(app).patch(`/tasks/${id}`).send({ done: true });
+
+    const { statusCode, body } = await request(app).get("/tasks?done=0");
+    expect(statusCode).toBe(200);
+    // como done=0 => false, la tarea marcada done=true no debe aparecer
+    expect(body.items.find((x) => x.id === id)).toBeUndefined();
+  });
+
+  test("GET /tasks?done=yes (string) -> equivale a true", async () => {
+    const {
+      body: { id },
+    } = await request(app).post("/tasks").send({ title: "T1" });
+
+    await request(app).patch(`/tasks/${id}`).send({ done: true });
+
+    const { statusCode, body } = await request(app).get("/tasks?done=yes");
+    expect(statusCode).toBe(200);
+    expect(body.items.find((x) => x.id === id)).toBeTruthy();
+  });
+
   test("GET /tasks?limit=5&page=2 -> paginación", async () => {
     // crea 12 tareas para asegurar 3 páginas con limit=5
     for (let i = 1; i <= 12; i += 1) {
@@ -60,6 +85,12 @@ describe("Tasks API", () => {
     expect(body.items.length).toBe(5);
     expect(body).toHaveProperty("meta");
     expect(body.meta).toMatchObject({ page: 2, limit: 5 });
+  });
+
+  test("GET /tasks?limit=0 -> 400 (validación)", async () => {
+    const { statusCode, body } = await request(app).get("/tasks?limit=0");
+    expect(statusCode).toBe(400);
+    expect(body).toHaveProperty("error");
   });
 
   test("PATCH /tasks/:id -> actualiza done", async () => {
