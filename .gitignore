@@ -12,7 +12,6 @@ README.old2.node_modules
 
 # local data / sqlite
 data/
-src/repositories/tasks.repo.sqlite.js
 *.sqlite
 *.db
 src/db/*.sqlite
